@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
 
+pub mod packet;
+
 use crate::util::Identifier;
 use anyhow::bail;
 use async_trait::async_trait;
@@ -10,27 +12,13 @@ use uuid::{Bytes, Uuid};
 
 #[async_trait::async_trait]
 pub trait PacketWrite: Sized {
-    async fn pack_write(&mut self, buffer: &mut Vec<u8>, target_version: u32)
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32)
         -> anyhow::Result<()>;
 }
 
 #[async_trait]
 pub trait PacketRead: Sized {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self>;
-}
-
-#[async_trait]
-impl<T> PacketWrite for Box<T>
-where
-    T: PacketWrite + Send,
-{
-    async fn pack_write(
-        &mut self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
-        (**self).pack_write(buffer, target_version).await
-    }
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self>;
 }
 
 macro_rules! __primitive_impl {
@@ -40,14 +28,14 @@ macro_rules! __primitive_impl {
         $(
             #[async_trait]
             impl PacketRead for $i {
-                async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+                async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
                     buffer.$read().await.map_err(anyhow::Error::from)
                 }
             }
 
             #[async_trait]
             impl PacketWrite for $i {
-                async fn pack_write(&mut self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
+                async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
                     buffer.$write(*self).await.map_err(anyhow::Error::from)?;
                     Ok(())
                 }
@@ -95,8 +83,7 @@ impl From<VarLong> for i64 {
 
 #[async_trait]
 impl PacketWrite for VarInt {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -120,7 +107,7 @@ impl PacketWrite for VarInt {
 
 #[async_trait]
 impl PacketRead for VarInt {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let mut size = 0;
         let mut v = 0;
 
@@ -147,8 +134,7 @@ impl PacketRead for VarInt {
 
 #[async_trait]
 impl PacketWrite for VarLong {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -172,7 +158,7 @@ impl PacketWrite for VarLong {
 
 #[async_trait]
 impl PacketRead for VarLong {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let mut size = 0;
         let mut v = 0;
 
@@ -200,10 +186,9 @@ impl PacketRead for VarLong {
 #[async_trait]
 impl<T> PacketWrite for Option<T>
 where
-    T: PacketWrite + Send,
+    T: PacketWrite + Send + Sync,
 {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -225,7 +210,7 @@ impl<T> PacketRead for Option<T>
 where
     T: PacketRead + Send,
 {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         return if buffer.read_u8().await? == 0 {
             Ok(None)
         } else {
@@ -236,8 +221,7 @@ where
 
 #[async_trait]
 impl PacketWrite for bool {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -248,7 +232,7 @@ impl PacketWrite for bool {
 
 #[async_trait]
 impl PacketRead for bool {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         Ok(buffer.read_u8().await? == 1)
     }
 }
@@ -257,7 +241,7 @@ const MAX_STRING_SIZE: usize = 32767;
 
 #[async_trait]
 impl PacketRead for String {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let size = VarInt::pack_read(buffer, target_version).await?.0 as usize;
 
         if size > MAX_STRING_SIZE {
@@ -275,14 +259,13 @@ impl PacketRead for String {
         let mut buf = vec![0u8; size];
         AsyncReadExt::read_exact(buffer, &mut buf).await?;
 
-        Ok(String::from_utf8(buf)?)
+        String::from_utf8(buf).map_err(anyhow::Error::from)
     }
 }
 
 #[async_trait]
 impl PacketWrite for String {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -311,15 +294,14 @@ impl PacketWrite for String {
 
 #[async_trait]
 impl PacketRead for Identifier {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         Identifier::parse(String::pack_read(buffer, target_version).await?)
     }
 }
 
 #[async_trait]
 impl PacketWrite for Identifier {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -329,7 +311,7 @@ impl PacketWrite for Identifier {
 
 #[async_trait]
 impl PacketRead for Uuid {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let mut bytes = Bytes::default();
 
         AsyncReadExt::read_exact(buffer, &mut bytes).await?;
@@ -340,8 +322,7 @@ impl PacketRead for Uuid {
 
 #[async_trait]
 impl PacketWrite for Uuid {
-    async fn pack_write(
-        &mut self,
+    async fn pack_write(&self,
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
@@ -355,7 +336,7 @@ const MAX_ARRAY_SIZE: usize = 1024 * 1024; // 2^20
 #[async_trait]
 impl<T> PacketRead for Vec<T>
 where T: PacketRead + Send {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let size = VarInt::pack_read(buffer, target_version).await?.0 as usize;
 
         if size > MAX_ARRAY_SIZE {
@@ -375,8 +356,8 @@ where T: PacketRead + Send {
 
 #[async_trait]
 impl<T> PacketWrite for Vec<T>
-where T: PacketWrite + Send {
-    async fn pack_write(&mut self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
+where T: PacketWrite + Send + Sync {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         let size = self.len();
 
         if size > MAX_ARRAY_SIZE {
@@ -399,7 +380,7 @@ pub struct ByteArray(pub Vec<u8>);
 
 #[async_trait]
 impl PacketWrite for ByteArray {
-    async fn pack_write(&mut self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         buffer.extend_from_slice(&self.0);
         Ok(())
     }
@@ -407,7 +388,7 @@ impl PacketWrite for ByteArray {
 
 #[async_trait]
 impl PacketRead for ByteArray {
-    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+    async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let mut buf = vec![];
 
         buffer.read_to_end(&mut buf).await?;
