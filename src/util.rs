@@ -4,7 +4,7 @@ use regex::Regex;
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Identifier {
     namespace: String,
-    path: String
+    path: String,
 }
 
 pub trait Identified {
@@ -24,8 +24,22 @@ impl Identifier {
         let ns = namespace.into();
         let p = path.into();
         Ok(Self {
-            namespace: if NAMESPACE_RE.is_match(&ns) { ns } else { bail!("Identifier namespace '{}' does not follow allowed pattern ([a-z\\d.-_]+)!", ns) },
-            path: if PATH_RE.is_match(&p) { p } else { bail!("Identifier path '{}' does not follow allowed pattern ([a-z\\d.-_/]+)!", p) },
+            namespace: if NAMESPACE_RE.is_match(&ns) {
+                ns
+            } else {
+                bail!(
+                    "Identifier namespace '{}' does not follow allowed pattern ([a-z\\d.-_]+)!",
+                    ns
+                )
+            },
+            path: if PATH_RE.is_match(&p) {
+                p
+            } else {
+                bail!(
+                    "Identifier path '{}' does not follow allowed pattern ([a-z\\d.-_/]+)!",
+                    p
+                )
+            },
         })
     }
 
@@ -33,7 +47,14 @@ impl Identifier {
         let p = path.into();
         Ok(Self {
             namespace: SOULFLAME_NAMESPACE.clone(),
-            path: if PATH_RE.is_match(&p) { p } else { bail!("Identifier path '{}' does not follow allowed pattern ([a-z\\d.-_/]+)!", p) },
+            path: if PATH_RE.is_match(&p) {
+                p
+            } else {
+                bail!(
+                    "Identifier path '{}' does not follow allowed pattern ([a-z\\d.-_/]+)!",
+                    p
+                )
+            },
         })
     }
 
@@ -41,7 +62,14 @@ impl Identifier {
         let p = path.into();
         Ok(Self {
             namespace: MINECRAFT_NAMESPACE.clone(),
-            path: if PATH_RE.is_match(&p) { p } else { bail!("Identifier path '{}' does not follow allowed pattern ([a-z\\d.-_/]+)!", p) },
+            path: if PATH_RE.is_match(&p) {
+                p
+            } else {
+                bail!(
+                    "Identifier path '{}' does not follow allowed pattern ([a-z\\d.-_/]+)!",
+                    p
+                )
+            },
         })
     }
 
@@ -57,8 +85,12 @@ impl Identifier {
         let text = from.into();
         let matches = FULL_RE.captures(&text);
         if let Some(captures) = matches {
-            let namespace = captures.get(0).ok_or_else(|| anyhow::Error::msg("Could not match identifier namespace!"))?;
-            let path = captures.get(1).ok_or_else(|| anyhow::Error::msg("Could not match identifier path!"))?;
+            let namespace = captures
+                .get(0)
+                .ok_or_else(|| anyhow::Error::msg("Could not match identifier namespace!"))?;
+            let path = captures
+                .get(1)
+                .ok_or_else(|| anyhow::Error::msg("Could not match identifier path!"))?;
             Identifier::new(namespace.as_str(), path.as_str())
         } else {
             bail!("Invalid identifier provided in string '{}'! Should follow pattern '[a-z\\d.-_]+:[a-z\\d.-_/]+'!", text);
