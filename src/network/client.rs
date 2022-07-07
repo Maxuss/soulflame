@@ -23,6 +23,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+use crate::component;
+use crate::protocol::server::login::PacketLoginOutDisconnect;
 
 pub struct ClientConnection {
     addr: SocketAddr,
@@ -106,7 +108,18 @@ impl ClientConnection {
                 }
             }
             HandshakeState::Login => {
-                info!("Logging in is not yet implemented!");
+                warn!("Logging in is not yet implemented!");
+
+                self.send_packet(
+                    PacketLoginOutDisconnect::new(
+                        component! {
+                            @Red "Logging in to "&
+                            @0x3394BB "Soul" &
+                            @0x3DB0DE "Flame" &
+                            @Red " is not yet implemented. " &
+                            @Gold bold "Coming Soon :tm:" })
+                ).await?;
+
                 bail!("Logging in is not yet implemented!")
             }
         };

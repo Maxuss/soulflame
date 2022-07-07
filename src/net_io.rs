@@ -9,6 +9,7 @@ use log::error;
 use std::io::Cursor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::{Bytes, Uuid};
+use serde::{Serialize, Deserialize};
 
 #[async_trait::async_trait]
 pub trait PacketWrite: Sized {
@@ -375,7 +376,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ByteArray(pub Vec<u8>);
 
 #[async_trait]

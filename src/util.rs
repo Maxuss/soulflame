@@ -1,7 +1,8 @@
 use anyhow::bail;
 use regex::Regex;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Identifier {
     namespace: String,
     path: String,

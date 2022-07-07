@@ -368,7 +368,7 @@ macro_rules! component {
     };
     // normal literals
     ( $(@ $hex_color:literal)* $(@ $named_color:ident)* $($attr:ident)* $(! $not_attr:ident)* $obj:literal $(& $($recurse:tt)*)?) => {
-        Component::text($obj.to_string()) $(.$attr(true))* $(.$not_attr(false))* $(.color(NamedColor::$named_color))* $(.hex_color($hex_color))* $(.append($crate::component!($($recurse)*)))?
+        Component::text($obj.to_string()) $(.$attr(true))* $(.$not_attr(false))* $(.color($crate::chat::NamedColor::$named_color))* $(.hex_color($hex_color))* $(.append($crate::component!($($recurse)*)))?
     };
     // variables
     ( $(@ $hex_color:literal)* $(@ $named_color:ident)* $($attr:ident)* $(! $not_attr:ident)* # $obj:ident $(& $($recurse:tt)*)?) => {

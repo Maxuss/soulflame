@@ -29,8 +29,8 @@ macro_rules! simplify {
     (ByteArray) => {
         Vec<u8>
     };
-    ($typ:ty) => {
-        $typ
+    ($typ:ident $(<$generic:ident>)?) => {
+        $typ $(<$generic>)?
     }
 }
 
@@ -86,9 +86,9 @@ macro_rules! writeable {
         VarLong($e as i64)
     };
     (ByteArray, $e:expr) => {
-        ByteArray($e)
+        ByteArray($e.clone())
     };
-    ($typ:ty, $e:expr) => {
+    ($typ:ident $(<$generic:ident>)?, $e:expr) => {
         $e
     };
 }
@@ -105,7 +105,7 @@ macro_rules! storage {
     (ByteArray, $e:expr) => {
         $e.0
     };
-    ($typ:ty, $e:expr) => {
+    ($typ:ident $(<$generic:ident>)?, $e:expr) => {
         $e
     };
 }
@@ -164,6 +164,68 @@ macro_rules! define_enum {
                 self.id().pack_write(buffer, target_version).await
             }
         }
+        )*
+    };
+}
+
+#[macro_export]
+macro_rules! packet_struct {
+    ($(
+        $name:ident {
+            $(
+                $field_name:ident: $field_ty:ident $(<$generic:ident>)?
+            ),* $(,)?
+        }
+    );* $(;)?) => {
+        $(
+            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+            pub struct $name {
+                $(
+                    $field_name: $crate::simplify!($field_ty $(<$generic>)?)
+                ),*
+            }
+
+            impl $name {
+                pub fn new($($field_name: $crate::simplify!($field_ty $(<$generic>)?)),*) -> Self {
+                    Self {
+                        $(
+                        $field_name
+                        ),*
+                    }
+                }
+
+                $(
+                pub fn $field_name(&self) -> &$crate::simplify!($field_ty $(<$generic>)?) {
+                    &self.$field_name
+                }
+                )*
+            }
+
+            #[async_trait::async_trait]
+            impl $crate::net_io::PacketRead for $name {
+                #[allow(unused_variables)]
+                async fn pack_read(buffer: &mut std::io::Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
+                    $(
+                    let $field_name = <$field_ty$(<$generic>)?>::pack_read(buffer, target_version).await?;
+                    )*
+                    Ok(Self {
+                        $(
+                        $field_name: $crate::storage!($field_ty $(<$generic>)?, $field_name),
+                        )*
+                    })
+                }
+            }
+
+            #[async_trait::async_trait]
+            impl $crate::net_io::PacketWrite for $name {
+                async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
+                    $(
+                    $crate::writeable!($field_ty$(<$generic>)?, self.$field_name).pack_write(buffer, target_version).await?;
+                    )*
+
+                    Ok(())
+                }
+            }
         )*
     };
 }
@@ -273,11 +335,11 @@ macro_rules! staged_packets {
                 #[allow(unused_variables)]
                 async fn pack_read(buffer: &mut std::io::Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
                     $(
-                    let $field_name = <$field_ty>::pack_read(buffer, target_version).await?;
+                    let $field_name = <$field_ty$(<$generic>)?>::pack_read(buffer, target_version).await?;
                     )*
                     Ok(Self {
                         $(
-                        $field_name: $crate::storage!($field_ty, $field_name),
+                        $field_name: $crate::storage!($field_ty$(<$generic>)?, $field_name),
                         )*
                     })
                 }
@@ -288,7 +350,7 @@ macro_rules! staged_packets {
                 async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
                     $crate::net_io::VarInt($id).pack_write(buffer, target_version).await?;
                     $(
-                    $crate::writeable!($field_ty$(<$generic>)?, self.$field_name).pack_write(buffer, target_version).await?;
+                    $crate::writeable!($field_ty, self.$field_name).pack_write(buffer, target_version).await?;
                     )*
 
                     Ok(())
