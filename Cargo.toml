@@ -13,10 +13,16 @@ toml = "0.5.9"
 log = "0.4.17"
 async-trait = "0.1.56"
 chrono = "0.4.19"
+regex = "1.6.0"
+lazy_static = "1.4.0"
 
-[dependencies.async-compression]
-version = "0.3.14"
-features = [ "zlib", "tokio" ]
+[dependencies.flate2]
+version = "1.0.24"
+features = ["zlib-ng"]
+
+[dependencies.uuid]
+version = "1.1.2"
+features = ["v4"]
 
 [dependencies.log4rs]
 version = "1.1.1"

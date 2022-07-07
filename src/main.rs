@@ -1,8 +1,8 @@
 pub mod network;
 pub mod net_io;
+pub mod util;
 
 use std::path::Path;
-use async_compression::tokio::write::ZlibEncoder;
 use chrono::Local;
 use log::{info, LevelFilter};
 use log4rs::append::console::ConsoleAppender;
