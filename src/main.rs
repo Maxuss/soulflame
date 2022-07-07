@@ -1,6 +1,8 @@
 pub mod net_io;
 pub mod network;
 pub mod util;
+#[cfg(test)]
+pub mod tests;
 
 use std::path::Path;
 

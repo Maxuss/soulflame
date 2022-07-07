@@ -286,7 +286,8 @@ impl PacketWrite for String {
         buffer: &mut Vec<u8>,
         target_version: u32,
     ) -> anyhow::Result<()> {
-        let size = self.len();
+        let bytes = self.as_bytes();
+        let size = bytes.len();
 
         if size > MAX_STRING_SIZE {
             error!(
@@ -300,7 +301,9 @@ impl PacketWrite for String {
             );
         }
 
-        buffer.extend_from_slice(&self.as_bytes());
+        VarInt(size as i32).pack_write(buffer, target_version).await?;
+
+        buffer.extend_from_slice(bytes);
 
         Ok(())
     }
@@ -344,5 +347,71 @@ impl PacketWrite for Uuid {
     ) -> anyhow::Result<()> {
         buffer.extend_from_slice(self.as_bytes());
         Ok(())
+    }
+}
+
+const MAX_ARRAY_SIZE: usize = 1024 * 1024; // 2^20
+
+#[async_trait]
+impl<T> PacketRead for Vec<T>
+where T: PacketRead + Send {
+    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+        let size = VarInt::pack_read(buffer, target_version).await?.0 as usize;
+
+        if size > MAX_ARRAY_SIZE {
+            error!("Tried to read array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
+            bail!("Tried to read array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
+        }
+
+        let mut vals = vec![];
+
+        for _ in 0..size {
+            vals.push(T::pack_read(buffer, target_version).await?);
+        }
+
+        Ok(vals)
+    }
+}
+
+#[async_trait]
+impl<T> PacketWrite for Vec<T>
+where T: PacketWrite + Send {
+    async fn pack_write(&mut self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
+        let size = self.len();
+
+        if size > MAX_ARRAY_SIZE {
+            error!("Tried to write array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
+            bail!("Tried to write array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
+        }
+
+        VarInt(size as i32).pack_write(buffer, target_version).await?;
+
+        for v in self {
+            v.pack_write(buffer, target_version).await?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ByteArray(pub Vec<u8>);
+
+#[async_trait]
+impl PacketWrite for ByteArray {
+    async fn pack_write(&mut self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
+        buffer.extend_from_slice(&self.0);
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl PacketRead for ByteArray {
+    async fn pack_read(buffer: &mut Cursor<Vec<u8>>, target_version: u32) -> anyhow::Result<Self> {
+        let mut buf = vec![];
+
+        buffer.read_to_end(&mut buf).await?;
+
+        Ok(ByteArray(buf))
     }
 }
