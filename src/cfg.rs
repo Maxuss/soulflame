@@ -1,13 +1,13 @@
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SoulflameConfiguration {
     pub max_players: u32,
     pub motd: String,
-    pub favicon: PathBuf
+    pub favicon: PathBuf,
 }
 
 impl Default for SoulflameConfiguration {
@@ -15,14 +15,14 @@ impl Default for SoulflameConfiguration {
         SoulflameConfiguration {
             max_players: 20,
             motd: "A Soulflame server.".to_string(),
-            favicon: Path::new("./soulflame/favicon.png").to_path_buf()
+            favicon: Path::new("./soulflame/favicon.png").to_path_buf(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RuntimeConfiguration {
-    pub favicon: String
+    pub favicon: String,
 }
 
 impl RuntimeConfiguration {
@@ -32,7 +32,7 @@ impl RuntimeConfiguration {
         favicon.read_to_end(&mut buf).await?;
 
         Ok(RuntimeConfiguration {
-            favicon: build_favicon(&buf[..])
+            favicon: build_favicon(&buf[..]),
         })
     }
 }

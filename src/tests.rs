@@ -1,5 +1,5 @@
-use std::io::Cursor;
 use crate::net_io::{PacketRead, PacketWrite};
+use std::io::Cursor;
 use tokio::test;
 use tokio::time::Instant;
 
@@ -7,7 +7,7 @@ const PROTO_VERSION: u32 = 759;
 
 #[test]
 async fn packet_io() -> anyhow::Result<()> {
-    let mut vi = "Test".to_string();
+    let vi = "Test".to_string();
     let mut buffer = vec![];
     vi.pack_write(&mut buffer, PROTO_VERSION).await?;
     println!("{:?}", buffer);
@@ -21,7 +21,11 @@ async fn packet_io() -> anyhow::Result<()> {
 async fn packet_vec() -> anyhow::Result<()> {
     let start = Instant::now();
 
-    let mut vec = vec!["string1".to_string(), "string2".to_string(), "string3".to_string()];
+    let vec = vec![
+        "string1".to_string(),
+        "string2".to_string(),
+        "string3".to_string(),
+    ];
     let mut buffer = vec![];
     vec.pack_write(&mut buffer, PROTO_VERSION).await?;
     println!("{:?}", buffer);

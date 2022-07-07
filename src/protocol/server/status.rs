@@ -1,5 +1,5 @@
-use crate::{json_packet_struct, staged_packets};
 use crate::chat::Component;
+use crate::{json_packet_struct, staged_packets};
 use uuid::Uuid;
 
 json_packet_struct! {

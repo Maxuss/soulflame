@@ -1,14 +1,14 @@
 #![feature(fn_traits)]
 
-#[cfg(test)]
-pub mod tests;
+pub mod cfg;
+pub mod chat;
 pub mod net_io;
 pub mod network;
-pub mod util;
-pub mod chat;
-pub mod world;
 pub mod protocol;
-pub mod cfg;
+#[cfg(test)]
+pub mod tests;
+pub mod util;
+pub mod world;
 
 use std::io::Cursor;
 use std::path::Path;
@@ -16,6 +16,8 @@ use std::path::Path;
 use log::{error, info, LevelFilter};
 use log4rs::append::console::ConsoleAppender;
 
+use crate::cfg::SoulflameConfiguration;
+use crate::network::NetworkListener;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
@@ -24,8 +26,6 @@ use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::{init_config, Config};
 use tokio::fs::create_dir_all;
-use crate::cfg::SoulflameConfiguration;
-use crate::network::NetworkListener;
 
 #[tokio::main]
 async fn main() {
@@ -35,7 +35,8 @@ async fn main() {
 
     info!("Starting SoulFlame server...");
 
-    let result = NetworkListener::init("127.0.0.1".into(), 25565, SoulflameConfiguration::default()).await;
+    let result =
+        NetworkListener::init("127.0.0.1".into(), 25565, SoulflameConfiguration::default()).await;
     if let Err(e) = result {
         error!("Failed starting network listener! Error: {}", e)
     }
@@ -46,11 +47,20 @@ async fn main() {
 async fn extract_resources() {
     let path = Path::new("./soulflame/favicon.png");
     if path.exists() {
-        return
+        return;
     }
-    create_dir_all("./soulflame").await.expect("Could not create directories");
+    create_dir_all("./soulflame")
+        .await
+        .expect("Could not create directories");
     let mut bytes = Cursor::new(include_bytes!("../res/favicon.png"));
-    tokio::io::copy(&mut bytes, &mut tokio::fs::File::create(path).await.expect("Could not create favicon file!")).await.expect("Could not copy default favicon!");
+    tokio::io::copy(
+        &mut bytes,
+        &mut tokio::fs::File::create(path)
+            .await
+            .expect("Could not create favicon file!"),
+    )
+    .await
+    .expect("Could not copy default favicon!");
 }
 
 async fn configure_logging() {

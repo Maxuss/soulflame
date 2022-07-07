@@ -1,5 +1,5 @@
-use crate::{define_enum, staged_packets};
 use crate::net_io::VarInt;
+use crate::{define_enum, staged_packets};
 
 define_enum! {
     HandshakeState {

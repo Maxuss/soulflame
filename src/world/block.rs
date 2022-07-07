@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Location {
@@ -6,7 +6,7 @@ pub struct Location {
     y: f32,
     z: f32,
     yaw: f32,
-    pitch: f32
+    pitch: f32,
 }
 
 impl Into<String> for Location {
@@ -22,7 +22,7 @@ impl Location {
             y: y.into(),
             z: z.into(),
             yaw: 0.0,
-            pitch: 0.0
+            pitch: 0.0,
         }
     }
 
@@ -32,7 +32,7 @@ impl Location {
             y: y.into(),
             z: z.into(),
             yaw: yaw.into(),
-            pitch: pitch.into()
+            pitch: pitch.into(),
         }
     }
 
@@ -55,5 +55,4 @@ impl Location {
     pub fn pitch(&self) -> f32 {
         self.pitch.clone()
     }
-
 }

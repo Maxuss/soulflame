@@ -1,21 +1,25 @@
-use std::io::Cursor;
 use crate::net_io::{PacketRead, PacketWrite, VarInt};
+use std::io::Cursor;
 
 #[derive(Debug, Clone)]
 pub struct PacketProxy {
     staging: Vec<u8>,
-    start_index: usize
+    start_index: usize,
 }
 
 impl PacketProxy {
     pub fn new() -> Self {
         Self {
             staging: vec![],
-            start_index: 0
+            start_index: 0,
         }
     }
 
-    pub async fn encode<P: PacketWrite>(&mut self, buffer: &mut Vec<u8>, packet: &P) -> anyhow::Result<()> {
+    pub async fn encode<P: PacketWrite>(
+        &mut self,
+        buffer: &mut Vec<u8>,
+        packet: &P,
+    ) -> anyhow::Result<()> {
         packet.pack_write(&mut self.staging, 759).await?;
 
         self.encode_uncompressed(buffer).await?;
@@ -55,7 +59,6 @@ impl PacketProxy {
 
                 let amount = len + pos;
                 self.staging = self.staging.split_off(amount);
-
 
                 Some(packet)
             } else {

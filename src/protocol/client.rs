@@ -1,3 +1,3 @@
 pub mod handshake;
-pub mod status;
 pub mod play;
+pub mod status;

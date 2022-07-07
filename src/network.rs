@@ -1,25 +1,31 @@
 pub mod client;
 pub mod proxy;
 
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
-use anyhow::{bail, Context};
-use log::{info, warn};
-use tokio::net::{TcpListener, TcpStream};
 use crate::cfg::{RuntimeConfiguration, SoulflameConfiguration};
 use crate::network::client::ClientConnection;
+use anyhow::{bail, Context};
+use log::{info, warn};
+use std::net::SocketAddr;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use tokio::net::{TcpListener, TcpStream};
 
 pub struct NetworkListener {
     inner: TcpListener,
     players: PlayerCount,
     config: SoulflameConfiguration,
-    runtime: RuntimeConfiguration
+    runtime: RuntimeConfiguration,
 }
 
 impl NetworkListener {
-    pub async fn init(addr: String, port: u16, configuration: SoulflameConfiguration) -> anyhow::Result<()> {
-        let listener = TcpListener::bind(format!("{}:{}", addr, port)).await.context("Failed to bind to port! Is it already in use?")?;
+    pub async fn init(
+        addr: String,
+        port: u16,
+        configuration: SoulflameConfiguration,
+    ) -> anyhow::Result<()> {
+        let listener = TcpListener::bind(format!("{}:{}", addr, port))
+            .await
+            .context("Failed to bind to port! Is it already in use?")?;
 
         info!("Started network listener successfully!");
 
@@ -27,7 +33,7 @@ impl NetworkListener {
             inner: listener,
             players: PlayerCount::new(configuration.max_players),
             config: configuration.clone(),
-            runtime: RuntimeConfiguration::from_cfg(&configuration).await?
+            runtime: RuntimeConfiguration::from_cfg(&configuration).await?,
         };
 
         this.network_loop().await;
@@ -44,14 +50,21 @@ impl NetworkListener {
     }
 
     async fn proceed(&mut self, stream: TcpStream, addr: SocketAddr) {
-        let connection = ClientConnection::new(stream, addr, self.players.clone(), self.config.clone(), self.runtime.clone()).await;
+        let connection = ClientConnection::new(
+            stream,
+            addr,
+            self.players.clone(),
+            self.config.clone(),
+            self.runtime.clone(),
+        )
+        .await;
         connection.start();
     }
 }
 
 #[derive(Clone)]
 pub struct PlayerCount {
-    inner: Arc<Players>
+    inner: Arc<Players>,
 }
 
 impl PlayerCount {
@@ -59,8 +72,8 @@ impl PlayerCount {
         Self {
             inner: Arc::new(Players {
                 count: AtomicU32::new(0),
-                max
-            })
+                max,
+            }),
         }
     }
 
@@ -70,12 +83,20 @@ impl PlayerCount {
             let new = count + 1;
 
             if new > self.inner.max {
-                warn!("Client tried to join, but max amount of players were online ({})", self.inner.max);
+                warn!(
+                    "Client tried to join, but max amount of players were online ({})",
+                    self.inner.max
+                );
                 bail!("Max player amount reached!")
             }
 
-            if self.inner.count.compare_exchange(count, new, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                return Ok(())
+            if self
+                .inner
+                .count
+                .compare_exchange(count, new, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                return Ok(());
             }
         }
     }
@@ -91,5 +112,5 @@ impl PlayerCount {
 
 struct Players {
     count: AtomicU32,
-    max: u32
+    max: u32,
 }

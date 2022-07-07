@@ -12,8 +12,7 @@ use uuid::{Bytes, Uuid};
 
 #[async_trait::async_trait]
 pub trait PacketWrite: Sized {
-    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32)
-        -> anyhow::Result<()>;
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()>;
 }
 
 #[async_trait]
@@ -83,10 +82,7 @@ impl From<VarLong> for i64 {
 
 #[async_trait]
 impl PacketWrite for VarInt {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         let mut v = self.0 as u32;
         loop {
             let mut temp = (v & 0b0111_1111) as u8;
@@ -134,10 +130,7 @@ impl PacketRead for VarInt {
 
 #[async_trait]
 impl PacketWrite for VarLong {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         let mut v = self.0 as u64;
         loop {
             let mut temp = (v & 0b0111_1111) as u8;
@@ -188,10 +181,7 @@ impl<T> PacketWrite for Option<T>
 where
     T: PacketWrite + Send + Sync,
 {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         match self {
             Some(v) => {
                 buffer.write_u8(1).await?;
@@ -221,10 +211,7 @@ where
 
 #[async_trait]
 impl PacketWrite for bool {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         buffer.write_u8(if *self { 1 } else { 0 }).await?;
         Ok(())
     }
@@ -265,10 +252,7 @@ impl PacketRead for String {
 
 #[async_trait]
 impl PacketWrite for String {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         let bytes = self.as_bytes();
         let size = bytes.len();
 
@@ -284,7 +268,9 @@ impl PacketWrite for String {
             );
         }
 
-        VarInt(size as i32).pack_write(buffer, target_version).await?;
+        VarInt(size as i32)
+            .pack_write(buffer, target_version)
+            .await?;
 
         buffer.extend_from_slice(bytes);
 
@@ -301,10 +287,7 @@ impl PacketRead for Identifier {
 
 #[async_trait]
 impl PacketWrite for Identifier {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         self.to_string().pack_write(buffer, target_version).await
     }
 }
@@ -322,10 +305,7 @@ impl PacketRead for Uuid {
 
 #[async_trait]
 impl PacketWrite for Uuid {
-    async fn pack_write(&self,
-        buffer: &mut Vec<u8>,
-        target_version: u32,
-    ) -> anyhow::Result<()> {
+    async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         buffer.extend_from_slice(self.as_bytes());
         Ok(())
     }
@@ -335,13 +315,22 @@ const MAX_ARRAY_SIZE: usize = 1024 * 1024; // 2^20
 
 #[async_trait]
 impl<T> PacketRead for Vec<T>
-where T: PacketRead + Send {
+where
+    T: PacketRead + Send,
+{
     async fn pack_read(buffer: &mut Cursor<&[u8]>, target_version: u32) -> anyhow::Result<Self> {
         let size = VarInt::pack_read(buffer, target_version).await?.0 as usize;
 
         if size > MAX_ARRAY_SIZE {
-            error!("Tried to read array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
-            bail!("Tried to read array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
+            error!(
+                "Tried to read array of size {}, which is larger than max size ({})",
+                size, MAX_ARRAY_SIZE
+            );
+            bail!(
+                "Tried to read array of size {}, which is larger than max size ({})",
+                size,
+                MAX_ARRAY_SIZE
+            );
         }
 
         let mut vals = vec![];
@@ -356,16 +345,27 @@ where T: PacketRead + Send {
 
 #[async_trait]
 impl<T> PacketWrite for Vec<T>
-where T: PacketWrite + Send + Sync {
+where
+    T: PacketWrite + Send + Sync,
+{
     async fn pack_write(&self, buffer: &mut Vec<u8>, target_version: u32) -> anyhow::Result<()> {
         let size = self.len();
 
         if size > MAX_ARRAY_SIZE {
-            error!("Tried to write array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
-            bail!("Tried to write array of size {}, which is larger than max size ({})", size, MAX_ARRAY_SIZE);
+            error!(
+                "Tried to write array of size {}, which is larger than max size ({})",
+                size, MAX_ARRAY_SIZE
+            );
+            bail!(
+                "Tried to write array of size {}, which is larger than max size ({})",
+                size,
+                MAX_ARRAY_SIZE
+            );
         }
 
-        VarInt(size as i32).pack_write(buffer, target_version).await?;
+        VarInt(size as i32)
+            .pack_write(buffer, target_version)
+            .await?;
 
         for v in self {
             v.pack_write(buffer, target_version).await?;

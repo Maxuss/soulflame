@@ -1,10 +1,10 @@
-use std::io::Cursor;
+use crate::net_io::{PacketRead, PacketWrite, VarInt};
 use anyhow::bail;
 use log::error;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use std::io::Cursor;
 use tokio::io::AsyncReadExt;
-use crate::net_io::{PacketRead, PacketWrite, VarInt};
 
 use crate::world::block::Location;
 
@@ -12,7 +12,10 @@ pub trait AsComponent {
     fn as_component(&self) -> Component;
 }
 
-impl<S> AsComponent for S where S: Into<String> + Clone {
+impl<S> AsComponent for S
+where
+    S: Into<String> + Clone,
+{
     fn as_component(&self) -> Component {
         let str: String = Clone::clone(self).into();
         Component::text(str)
@@ -59,8 +62,8 @@ macro_rules! _fmt_impl {
 
 impl Component {
     pub fn text<S>(msg: S) -> Self
-        where
-            S: Into<String>,
+    where
+        S: Into<String>,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Plain { text: msg.into() };
@@ -68,9 +71,9 @@ impl Component {
     }
 
     pub fn translate<S, C>(msg: S, placeholders: Option<Vec<C>>) -> Self
-        where
-            S: Into<String>,
-            C: AsComponent,
+    where
+        S: Into<String>,
+        C: AsComponent,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Translate(TranslatedMessage {
@@ -85,8 +88,8 @@ impl Component {
     }
 
     pub fn score<S>(name: S, objective: S, placeholder: Option<S>) -> Self
-        where
-            S: Into<String>,
+    where
+        S: Into<String>,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Score {
@@ -100,9 +103,9 @@ impl Component {
     }
 
     pub fn entity<S, C>(selector: S, separator: Option<C>) -> Self
-        where
-            S: Into<String>,
-            C: AsComponent,
+    where
+        S: Into<String>,
+        C: AsComponent,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Entity(Box::from(EntityMessage {
@@ -114,7 +117,9 @@ impl Component {
 
     pub fn keybind<S: Into<String>>(key: S) -> Self {
         let mut df = Self::default();
-        df.contents = MessageContents::Keybind(KeyMessage { keybind: key.into() });
+        df.contents = MessageContents::Keybind(KeyMessage {
+            keybind: key.into(),
+        });
         df.clone()
     }
 
@@ -124,9 +129,9 @@ impl Component {
         interpret: Option<bool>,
         separator: Option<C>,
     ) -> Self
-        where
-            S: Into<String>,
-            C: AsComponent,
+    where
+        S: Into<String>,
+        C: AsComponent,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Nbt(Box::from(NbtMessage {
@@ -146,9 +151,9 @@ impl Component {
         interpret: Option<bool>,
         separator: Option<C>,
     ) -> Self
-        where
-            S: Into<String>,
-            C: AsComponent,
+    where
+        S: Into<String>,
+        C: AsComponent,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Nbt(Box::from(NbtMessage {
@@ -168,9 +173,9 @@ impl Component {
         interpret: Option<bool>,
         separator: Option<C>,
     ) -> Self
-        where
-            S: Into<String>,
-            C: AsComponent,
+    where
+        S: Into<String>,
+        C: AsComponent,
     {
         let mut df = Self::default();
         df.contents = MessageContents::Nbt(Box::from(NbtMessage {
@@ -185,8 +190,8 @@ impl Component {
     }
 
     pub fn append<C>(&mut self, comp: C) -> Self
-        where
-            C: Into<Component>,
+    where
+        C: Into<Component>,
     {
         if let Some(vec) = &mut self.extra {
             vec.push(comp.into());
@@ -311,7 +316,8 @@ impl PacketWrite for Component {
         if size > MAX_COMPONENT_JSON_SIZE {
             log::error!(
                 "Write Component too long (max size: {}, json size: {})",
-                MAX_COMPONENT_JSON_SIZE, size
+                MAX_COMPONENT_JSON_SIZE,
+                size
             );
             bail!(
                 "Write Component too long (max size: {}, json size: {})",
@@ -320,7 +326,9 @@ impl PacketWrite for Component {
             );
         }
 
-        VarInt(size as i32).pack_write(buffer, target_version).await?;
+        VarInt(size as i32)
+            .pack_write(buffer, target_version)
+            .await?;
 
         buffer.extend_from_slice(bytes);
 

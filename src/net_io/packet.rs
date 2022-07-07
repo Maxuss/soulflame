@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ProtocolSide {
     Outgoing,
-    Inbound
+    Inbound,
 }
 
 pub trait PacketStage {
@@ -90,7 +90,7 @@ macro_rules! writeable {
     };
     ($typ:ty, $e:expr) => {
         $e
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -107,7 +107,7 @@ macro_rules! storage {
     };
     ($typ:ty, $e:expr) => {
         $e
-    }
+    };
 }
 
 #[macro_export]

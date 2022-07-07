@@ -1,25 +1,28 @@
 #![allow(dead_code)]
 
-use std::fmt::Debug;
-use std::net::SocketAddr;
-use std::time::Duration;
-use anyhow::bail;
-use flume::{Receiver, Sender};
-use log::{info, warn};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::TcpStream;
-use tokio::time::timeout;
 use crate::cfg::{RuntimeConfiguration, SoulflameConfiguration};
 use crate::chat::{Component, NamedColor};
 use crate::net_io::{PacketRead, PacketWrite};
-use crate::network::PlayerCount;
 use crate::network::proxy::PacketProxy;
+use crate::network::PlayerCount;
 use crate::protocol::client::handshake::{HandshakeState, InHandshake};
 use crate::protocol::client::play::PacketPlayIn;
 use crate::protocol::client::status::{InStatus, PacketStatusInPing};
 use crate::protocol::server::play::PacketPlayOut;
-use crate::protocol::server::status::{OutStatus, PacketStatusOutPong, PacketStatusOutResponse, ServerPlayers, ServerVersion, StatusResponse};
+use crate::protocol::server::status::{
+    OutStatus, PacketStatusOutPong, PacketStatusOutResponse, ServerPlayers, ServerVersion,
+    StatusResponse,
+};
+use anyhow::bail;
+use flume::{Receiver, Sender};
+use log::{info, warn};
+use std::fmt::Debug;
+use std::net::SocketAddr;
+use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::TcpStream;
+use tokio::time::timeout;
 
 pub struct ClientConnection {
     addr: SocketAddr,
@@ -31,7 +34,7 @@ pub struct ClientConnection {
     outgoing: OutgoingPacketChannel,
 
     send_packets: Sender<PacketPlayOut>,
-    receive_packets: Receiver<PacketPlayIn>
+    receive_packets: Receiver<PacketPlayIn>,
 }
 
 impl ClientConnection {
@@ -40,7 +43,7 @@ impl ClientConnection {
         addr: SocketAddr,
         players: PlayerCount,
         config: SoulflameConfiguration,
-        runtime: RuntimeConfiguration
+        runtime: RuntimeConfiguration,
     ) -> Self {
         let (reader, writer) = stream.into_split();
 
@@ -56,7 +59,7 @@ impl ClientConnection {
             inbound: InboundPacketChannel::new(reader, receive_packets_tx, addr.clone()),
             outgoing: OutgoingPacketChannel::new(writer, send_packets_rx, addr.clone()),
             send_packets: send_packets_tx,
-            receive_packets: receive_packets_rx
+            receive_packets: receive_packets_rx,
         }
     }
 
@@ -84,15 +87,18 @@ impl ClientConnection {
                     ServerVersion::new("Latest".into(), 759),
                     ServerPlayers::new(self.config.max_players as i32, 0, vec![]),
                     Component::text(&self.config.motd).color(NamedColor::DarkGray),
-                    self.runtime.favicon.clone()
+                    self.runtime.favicon.clone(),
                 );
 
-                self.send_packet(OutStatus::PacketStatusOutResponse(PacketStatusOutResponse::new(payload))).await?;
-
+                self.send_packet(OutStatus::PacketStatusOutResponse(
+                    PacketStatusOutResponse::new(payload),
+                ))
+                .await?;
 
                 match self.read_packet::<PacketStatusInPing>().await {
                     Ok(ping) => {
-                        self.send_packet(PacketStatusOutPong::new(*ping.payload())).await?;
+                        self.send_packet(PacketStatusOutPong::new(*ping.payload()))
+                            .await?;
                     }
                     Err(e) => {
                         warn!("Didn't receive ping packet from status call: {}", e);
@@ -132,7 +138,7 @@ impl InboundPacketChannel {
             packets,
             proxy: PacketProxy::new(),
             buffer: [0u8; 1024],
-            addr
+            addr,
         }
     }
 
@@ -141,7 +147,7 @@ impl InboundPacketChannel {
             let packet = self.read_packet::<PacketPlayIn>().await?;
             if let Err(_) = self.packets.send_async(packet).await {
                 info!("Server dropped connection for client {}!", self.addr.ip());
-                return Ok(())
+                return Ok(());
             }
         }
     }
@@ -150,7 +156,7 @@ impl InboundPacketChannel {
         loop {
             let next: Option<P> = self.proxy.next::<P>().await?;
             if let Some(packet) = next {
-                return Ok(packet)
+                return Ok(packet);
             }
 
             // 5s timeout
@@ -183,7 +189,7 @@ impl OutgoingPacketChannel {
             packets,
             proxy: PacketProxy::new(),
             buffer: vec![],
-            addr
+            addr,
         }
     }
 
