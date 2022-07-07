@@ -1,5 +1,5 @@
-use crate::staged_packets;
 use crate::net_io::{ByteArray, VarInt};
+use crate::staged_packets;
 pub type ByteVec = Vec<u8>;
 
 staged_packets! {

@@ -1,8 +1,8 @@
-use crate::{packet_struct, staged_packets};
-use crate::net_io::{ByteArray, VarInt};
 use crate::chat::Component;
-use uuid::Uuid;
+use crate::net_io::{ByteArray, VarInt};
 use crate::util::Identifier;
+use crate::{packet_struct, staged_packets};
+use uuid::Uuid;
 
 packet_struct! {
     ProfileProperty {

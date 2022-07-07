@@ -2,12 +2,14 @@
 
 use crate::cfg::{RuntimeConfiguration, SoulflameConfiguration};
 use crate::chat::{Component, NamedColor};
+use crate::component;
 use crate::net_io::{PacketRead, PacketWrite};
 use crate::network::proxy::PacketProxy;
 use crate::network::PlayerCount;
 use crate::protocol::client::handshake::{HandshakeState, InHandshake};
 use crate::protocol::client::play::PacketPlayIn;
 use crate::protocol::client::status::{InStatus, PacketStatusInPing};
+use crate::protocol::server::login::PacketLoginOutDisconnect;
 use crate::protocol::server::play::PacketPlayOut;
 use crate::protocol::server::status::{
     OutStatus, PacketStatusOutPong, PacketStatusOutResponse, ServerPlayers, ServerVersion,
@@ -23,8 +25,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use crate::component;
-use crate::protocol::server::login::PacketLoginOutDisconnect;
 
 pub struct ClientConnection {
     addr: SocketAddr,
@@ -110,15 +110,13 @@ impl ClientConnection {
             HandshakeState::Login => {
                 warn!("Logging in is not yet implemented!");
 
-                self.send_packet(
-                    PacketLoginOutDisconnect::new(
-                        component! {
-                            @Red "Logging in to "&
-                            @0x3394BB "Soul" &
-                            @0x3DB0DE "Flame" &
-                            @Red " is not yet implemented. " &
-                            @Gold bold "Coming Soon :tm:" })
-                ).await?;
+                self.send_packet(PacketLoginOutDisconnect::new(component! {
+                @Red "Logging in to "&
+                @0x3394BB "Soul" &
+                @0x3DB0DE "Flame" &
+                @Red " is not yet implemented. " &
+                @Gold bold "Coming Soon :tm:" }))
+                    .await?;
 
                 bail!("Logging in is not yet implemented!")
             }

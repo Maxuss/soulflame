@@ -6,10 +6,10 @@ use crate::util::Identifier;
 use anyhow::bail;
 use async_trait::async_trait;
 use log::error;
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::{Bytes, Uuid};
-use serde::{Serialize, Deserialize};
 
 #[async_trait::async_trait]
 pub trait PacketWrite: Sized {
