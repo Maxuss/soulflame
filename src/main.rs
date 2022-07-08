@@ -35,8 +35,13 @@ async fn main() {
 
     info!("Starting SoulFlame server...");
 
+    let config = SoulflameConfiguration {
+        max_players: 100,
+        motd: "<aqua>The best server ever".to_string(),
+        favicon: Path::new("./soulflame/favicon.png").to_path_buf()
+    };
     let result =
-        NetworkListener::init("127.0.0.1".into(), 25565, SoulflameConfiguration::default()).await;
+        NetworkListener::init("127.0.0.1".into(), 25565, config).await;
     if let Err(e) = result {
         error!("Failed starting network listener! Error: {}", e)
     }

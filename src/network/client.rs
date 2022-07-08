@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 
 use crate::cfg::{RuntimeConfiguration, SoulflameConfiguration};
-use crate::chat::{Component, NamedColor};
-use crate::component;
+use crate::chat::Component;
 use crate::net_io::{PacketRead, PacketWrite};
 use crate::network::proxy::PacketProxy;
 use crate::network::PlayerCount;
@@ -10,7 +9,7 @@ use crate::protocol::client::handshake::{HandshakeState, InHandshake};
 use crate::protocol::client::play::PacketPlayIn;
 use crate::protocol::client::status::{InStatus, PacketStatusInPing};
 use crate::protocol::server::login::PacketLoginOutDisconnect;
-use crate::protocol::server::play::PacketPlayOut;
+use crate::protocol::server::play::{PacketPlayOut, PacketPlayOutDisconnect};
 use crate::protocol::server::status::{
     OutStatus, PacketStatusOutPong, PacketStatusOutResponse, ServerPlayers, ServerVersion,
     StatusResponse,
@@ -21,16 +20,26 @@ use log::{info, warn};
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::time::Duration;
+use lobstermessage::lobster;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ProtocolState {
+    Handshake,
+    Status,
+    Login,
+    Play
+}
 
 pub struct ClientConnection {
     addr: SocketAddr,
     players: PlayerCount,
     config: SoulflameConfiguration,
     runtime: RuntimeConfiguration,
+    state: ProtocolState,
 
     inbound: InboundPacketChannel,
     outgoing: OutgoingPacketChannel,
@@ -58,6 +67,7 @@ impl ClientConnection {
             players,
             config,
             runtime,
+            state: ProtocolState::Handshake,
             inbound: InboundPacketChannel::new(reader, receive_packets_tx, addr.clone()),
             outgoing: OutgoingPacketChannel::new(writer, send_packets_rx, addr.clone()),
             send_packets: send_packets_tx,
@@ -83,12 +93,14 @@ impl ClientConnection {
         let InHandshake::PacketHandshakeIn(handshake) = self.read_packet().await?;
         match handshake.next_state() {
             HandshakeState::Status => {
+                self.state = ProtocolState::Status;
+
                 let _request = self.read_packet::<InStatus>().await?;
 
                 let payload = StatusResponse::new(
                     ServerVersion::new("Latest".into(), 759),
                     ServerPlayers::new(self.config.max_players as i32, 0, vec![]),
-                    Component::text(&self.config.motd).color(NamedColor::DarkGray),
+                    lobster(&self.config.motd),
                     self.runtime.favicon.clone(),
                 );
 
@@ -108,19 +120,31 @@ impl ClientConnection {
                 }
             }
             HandshakeState::Login => {
+                self.state = ProtocolState::Login;
+
                 warn!("Logging in is not yet implemented!");
 
-                self.send_packet(PacketLoginOutDisconnect::new(component! {
-                @Red "Logging in to "&
-                @0x3394BB "Soul" &
-                @0x3DB0DE "Flame" &
-                @Red " is not yet implemented. " &
-                @Gold bold "Coming Soon :tm:" }))
-                    .await?;
+                self.disconnect(lobster("<red>Logging in is not yet supported!")).await?;
 
-                bail!("Logging in is not yet implemented!")
+                return Ok(())
             }
         };
+
+        Ok(())
+    }
+
+    pub async fn disconnect(&mut self, reason: Component) -> anyhow::Result<()> {
+        let mut r = reason.clone();
+        match self.state {
+            ProtocolState::Login => {
+                self.outgoing.send_packet(PacketLoginOutDisconnect::new(reason)).await?
+            }
+            ProtocolState::Play => {
+                self.outgoing.send_packet(PacketPlayOutDisconnect::new(reason)).await?
+            }
+            _ => bail!("Can not disconnect player during {:?} state!", self.state)
+        };
+        info!("Client {} lost connection: {}", self.addr.ip(), r.flatten());
 
         Ok(())
     }

@@ -1,9 +1,10 @@
 use crate::staged_packets;
+use crate::chat::Component;
 
 staged_packets! {
     PacketPlayOut("play", Outgoing) {
-        Null(0x00) {
-
+        PacketPlayOutDisconnect(0x17) {
+            reason: Component
         }
     }
 }

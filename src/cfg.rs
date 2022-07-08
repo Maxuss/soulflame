@@ -14,7 +14,7 @@ impl Default for SoulflameConfiguration {
     fn default() -> Self {
         SoulflameConfiguration {
             max_players: 20,
-            motd: "A Soulflame server.".to_string(),
+            motd: "<dark_gray>A Soulflame server.".to_string(),
             favicon: Path::new("./soulflame/favicon.png").to_path_buf(),
         }
     }
