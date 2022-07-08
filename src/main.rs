@@ -27,6 +27,8 @@ use log4rs::encode::pattern::PatternEncoder;
 use log4rs::{init_config, Config};
 use tokio::fs::create_dir_all;
 
+pub static LATEST_PROTOCOL_VERSION: u32 = 759;
+
 #[tokio::main]
 async fn main() {
     extract_resources().await;

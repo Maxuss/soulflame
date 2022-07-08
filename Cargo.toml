@@ -20,12 +20,20 @@ hematite-nbt = "0.5.2"
 flume = "0.10.13"
 base64 = "0.20.0-alpha.1"
 
+aes = "0.8.1"
+cfb8 = "0.8.1"
+sha1 = "0.10.1"
+
+[dependencies.async-compression]
+version = "0.3.14"
+features = ["tokio", "zlib"]
+
 [dependencies.lobstermessage]
 path = "../lobstermessage"
 
-[dependencies.flate2]
-version = "1.0.24"
-features = ["zlib-ng"]
+#[dependencies.flate2]
+#version = "1.0.24"
+#features = ["zlib-ng"]
 
 [dependencies.uuid]
 version = "1.1.2"

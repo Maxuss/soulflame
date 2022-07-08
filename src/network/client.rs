@@ -3,7 +3,7 @@
 use crate::cfg::{RuntimeConfiguration, SoulflameConfiguration};
 use crate::chat::Component;
 use crate::net_io::{PacketRead, PacketWrite};
-use crate::network::proxy::PacketProxy;
+use crate::network::encode::{PacketDecoder, PacketEncoder};
 use crate::network::PlayerCount;
 use crate::protocol::client::handshake::{HandshakeState, InHandshake};
 use crate::protocol::client::play::PacketPlayIn;
@@ -19,7 +19,6 @@ use flume::{Receiver, Sender};
 use log::{info, warn};
 use std::fmt::Debug;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::Duration;
 use lobstermessage::lobster;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -159,16 +158,10 @@ impl ClientConnection {
     }
 }
 
-impl Drop for ClientConnection {
-    fn drop(&mut self) {
-        tokio::task::spawn(self.disconnect(lobster("<gray>Connection drop.")));
-    }
-}
-
 pub struct InboundPacketChannel {
     reader: OwnedReadHalf,
     packets: Sender<PacketPlayIn>,
-    proxy: PacketProxy,
+    dec: PacketDecoder,
     buffer: [u8; 1024],
     addr: SocketAddr,
 }
@@ -178,10 +171,18 @@ impl InboundPacketChannel {
         Self {
             reader,
             packets,
-            proxy: PacketProxy::new(),
+            dec: PacketDecoder::new(),
             buffer: [0u8; 1024],
             addr,
         }
+    }
+
+    pub fn set_encryption(&mut self, key: [u8; 16]) {
+        self.dec.set_encryption(key);
+    }
+
+    pub fn set_compression(&mut self, threshold: usize) {
+        self.dec.set_compression(threshold);
     }
 
     pub async fn start(mut self) -> anyhow::Result<()> {
@@ -196,7 +197,7 @@ impl InboundPacketChannel {
 
     pub async fn read_packet<P: PacketRead>(&mut self) -> anyhow::Result<P> {
         loop {
-            let next: Option<P> = self.proxy.next::<P>().await?;
+            let next: Option<P> = self.dec.read::<P>().await?;
             if let Some(packet) = next {
                 return Ok(packet);
             }
@@ -211,7 +212,7 @@ impl InboundPacketChannel {
             }
 
             let bytes = &self.buffer[..read];
-            self.proxy.accept(bytes);
+            self.dec.digest(bytes);
         }
     }
 }
@@ -219,7 +220,7 @@ impl InboundPacketChannel {
 pub struct OutgoingPacketChannel {
     writer: OwnedWriteHalf,
     packets: Receiver<PacketPlayOut>,
-    proxy: PacketProxy,
+    enc: PacketEncoder,
     buffer: Vec<u8>,
     addr: SocketAddr,
 }
@@ -229,10 +230,18 @@ impl OutgoingPacketChannel {
         Self {
             writer,
             packets,
-            proxy: PacketProxy::new(),
+            enc: PacketEncoder::new(),
             buffer: vec![],
             addr,
         }
+    }
+
+    pub fn set_encryption(&mut self, key: [u8; 16]) {
+        self.enc.set_encryption(key);
+    }
+
+    pub fn set_compression(&mut self, threshold: usize) {
+        self.enc.set_compression(threshold);
     }
 
     pub async fn start(mut self) -> anyhow::Result<()> {
@@ -243,7 +252,7 @@ impl OutgoingPacketChannel {
     }
 
     pub async fn send_packet<P: PacketWrite + Debug>(&mut self, packet: P) -> anyhow::Result<()> {
-        self.proxy.encode(&mut self.buffer, &packet).await?;
+        self.enc.consume(&mut self.buffer, &packet).await?;
         self.writer.write_all(&self.buffer).await?;
         self.buffer.clear();
         Ok(())

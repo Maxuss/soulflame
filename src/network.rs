@@ -1,5 +1,5 @@
 pub mod client;
-pub mod proxy;
+pub mod encode;
 
 use crate::cfg::{RuntimeConfiguration, SoulflameConfiguration};
 use crate::network::client::ClientConnection;
