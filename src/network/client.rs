@@ -19,6 +19,7 @@ use flume::{Receiver, Sender};
 use log::{info, warn};
 use std::fmt::Debug;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 use lobstermessage::lobster;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -155,6 +156,12 @@ impl ClientConnection {
 
     pub async fn send_packet<P: PacketWrite + Debug>(&mut self, packet: P) -> anyhow::Result<()> {
         self.outgoing.send_packet(packet).await
+    }
+}
+
+impl Drop for ClientConnection {
+    fn drop(&mut self) {
+        tokio::task::spawn(self.disconnect(lobster("<gray>Connection drop.")));
     }
 }
 
