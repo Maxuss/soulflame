@@ -20,6 +20,9 @@ hematite-nbt = "0.5.2"
 flume = "0.10.13"
 base64 = "0.20.0-alpha.1"
 
+[dependencies.lobstermessage]
+path = "../lobstermessage"
+
 [dependencies.flate2]
 version = "1.0.24"
 features = ["zlib-ng"]
