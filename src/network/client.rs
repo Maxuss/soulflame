@@ -16,11 +16,11 @@ use crate::protocol::server::status::{
 };
 use anyhow::bail;
 use flume::{Receiver, Sender};
+use lobstermessage::lobster;
 use log::{info, warn};
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::time::Duration;
-use lobstermessage::lobster;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
@@ -31,7 +31,7 @@ pub enum ProtocolState {
     Handshake,
     Status,
     Login,
-    Play
+    Play,
 }
 
 pub struct ClientConnection {
@@ -124,9 +124,10 @@ impl ClientConnection {
 
                 warn!("Logging in is not yet implemented!");
 
-                self.disconnect(lobster("<red>Logging in is not yet supported!")).await?;
+                self.disconnect(lobster("<red>Logging in is not yet supported!"))
+                    .await?;
 
-                return Ok(())
+                return Ok(());
             }
         };
 
@@ -137,12 +138,16 @@ impl ClientConnection {
         let mut r = reason.clone();
         match self.state {
             ProtocolState::Login => {
-                self.outgoing.send_packet(PacketLoginOutDisconnect::new(reason)).await?
+                self.outgoing
+                    .send_packet(PacketLoginOutDisconnect::new(reason))
+                    .await?
             }
             ProtocolState::Play => {
-                self.outgoing.send_packet(PacketPlayOutDisconnect::new(reason)).await?
+                self.outgoing
+                    .send_packet(PacketPlayOutDisconnect::new(reason))
+                    .await?
             }
-            _ => bail!("Can not disconnect player during {:?} state!", self.state)
+            _ => bail!("Can not disconnect player during {:?} state!", self.state),
         };
         info!("Client {} lost connection: {}", self.addr.ip(), r.flatten());
 

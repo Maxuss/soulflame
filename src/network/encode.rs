@@ -1,11 +1,11 @@
 use crate::net_io::{PacketRead, PacketWrite, VarInt};
-use std::io::Cursor;
-use aes::Aes128;
+use crate::LATEST_PROTOCOL_VERSION;
 use aes::cipher::{AsyncStreamCipher, KeyIvInit};
+use aes::Aes128;
 use async_compression::tokio::bufread::{ZlibDecoder, ZlibEncoder};
 use cfb8::{Decryptor, Encryptor};
+use std::io::Cursor;
 use tokio::io::AsyncReadExt;
-use crate::LATEST_PROTOCOL_VERSION;
 
 pub type AesEnc = Encryptor<Aes128>;
 pub type AesDec = Decryptor<Aes128>;
@@ -17,7 +17,7 @@ pub struct PacketEncoder {
     staging_buf: Vec<u8>,
 
     compression_threshold: Option<usize>,
-    compression_buf: Vec<u8>
+    compression_buf: Vec<u8>,
 }
 
 impl PacketEncoder {
@@ -27,7 +27,7 @@ impl PacketEncoder {
             shared_secret: None,
             staging_buf: vec![],
             compression_threshold: None,
-            compression_buf: vec![]
+            compression_buf: vec![],
         }
     }
 
@@ -43,9 +43,11 @@ impl PacketEncoder {
     pub async fn consume<P: PacketWrite>(
         &mut self,
         out_buffer: &mut Vec<u8>,
-        packet: &P
+        packet: &P,
     ) -> anyhow::Result<()> {
-        packet.pack_write(&mut self.staging_buf, LATEST_PROTOCOL_VERSION).await?;
+        packet
+            .pack_write(&mut self.staging_buf, LATEST_PROTOCOL_VERSION)
+            .await?;
 
         if let Some(_) = self.compression_threshold {
             self.write_compressed(out_buffer).await?;
@@ -75,11 +77,17 @@ impl PacketEncoder {
         }
 
         let mut buf: Vec<u8> = vec![];
-        VarInt(data_len as i32).pack_write(&mut buf, LATEST_PROTOCOL_VERSION).await?;
+        VarInt(data_len as i32)
+            .pack_write(&mut buf, LATEST_PROTOCOL_VERSION)
+            .await?;
 
         let packet_size = buf.len() + slice.len();
-        VarInt(packet_size as i32).pack_write(&mut buf, LATEST_PROTOCOL_VERSION).await?;
-        VarInt(data_len as i32).pack_write(&mut buf, LATEST_PROTOCOL_VERSION).await?;
+        VarInt(packet_size as i32)
+            .pack_write(&mut buf, LATEST_PROTOCOL_VERSION)
+            .await?;
+        VarInt(data_len as i32)
+            .pack_write(&mut buf, LATEST_PROTOCOL_VERSION)
+            .await?;
         buffer.extend_from_slice(&buf);
 
         self.compression_buf.clear();
@@ -89,7 +97,9 @@ impl PacketEncoder {
 
     async fn write(&mut self, buffer: &mut Vec<u8>) -> anyhow::Result<()> {
         let packet_len = self.staging_buf.len() as i32;
-        VarInt(packet_len).pack_write(buffer, LATEST_PROTOCOL_VERSION).await?;
+        VarInt(packet_len)
+            .pack_write(buffer, LATEST_PROTOCOL_VERSION)
+            .await?;
         buffer.extend_from_slice(&self.staging_buf);
 
         Ok(())
@@ -103,7 +113,7 @@ pub struct PacketDecoder {
     staging_buf: Vec<u8>,
 
     compression_threshold: Option<usize>,
-    compression_buf: Vec<u8>
+    compression_buf: Vec<u8>,
 }
 
 impl PacketDecoder {
@@ -113,7 +123,7 @@ impl PacketDecoder {
             shared_secret: None,
             staging_buf: vec![],
             compression_threshold: None,
-            compression_buf: vec![]
+            compression_buf: vec![],
         }
     }
 
@@ -136,17 +146,21 @@ impl PacketDecoder {
 
     pub async fn read<P: PacketRead>(&mut self) -> anyhow::Result<Option<P>> {
         let mut reader = Cursor::new(&self.staging_buf[..]);
-        let packet = if let Ok(VarInt(size)) = VarInt::pack_read(&mut reader, LATEST_PROTOCOL_VERSION).await {
+        let packet = if let Ok(VarInt(size)) =
+            VarInt::pack_read(&mut reader, LATEST_PROTOCOL_VERSION).await
+        {
             let varint_len = reader.position() as usize;
 
             if self.staging_buf.len() - varint_len >= size as usize {
                 reader = Cursor::new(&self.staging_buf[varint_len..varint_len + size as usize]);
 
                 if let Some(_) = self.compression_threshold {
-                    let VarInt(data_len) = VarInt::pack_read(&mut reader, LATEST_PROTOCOL_VERSION).await?;
+                    let VarInt(data_len) =
+                        VarInt::pack_read(&mut reader, LATEST_PROTOCOL_VERSION).await?;
 
                     if data_len > 0 {
-                        let mut dec = ZlibDecoder::new(&reader.get_ref()[reader.position() as usize ..]);
+                        let mut dec =
+                            ZlibDecoder::new(&reader.get_ref()[reader.position() as usize..]);
                         dec.read_to_end(&mut self.compression_buf).await?;
                         reader = Cursor::new(&self.compression_buf);
                     }

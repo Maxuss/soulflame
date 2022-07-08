@@ -33,7 +33,7 @@ impl NetworkListener {
             inner: listener,
             players: PlayerCount::new(configuration.max_players),
             config: configuration.clone(),
-            runtime: RuntimeConfiguration::from_cfg(&configuration).await?
+            runtime: RuntimeConfiguration::from_cfg(&configuration).await?,
         };
 
         this.network_loop().await;
